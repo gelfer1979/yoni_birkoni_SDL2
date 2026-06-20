@@ -26,7 +26,7 @@
             "group": "build",
             "problemMatcher": "$gcc"
         },
-        {
+        /*
             "label": "Build Android",
             "type": "shell",
             "command": "cmake",
@@ -36,7 +36,7 @@
             ],
             "group": "build",
             "problemMatcher": "$gcc"
-        },
+        },*/
         {
             "label": "Build Linux",
             "type": "shell",
@@ -70,6 +70,35 @@
                 "--directory",
                 "${workspaceFolder}/build_wasm/bin"
             ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Android APK",
+            "type": "shell",
+            "command": "${workspaceFolder}/android/gradlew.bat",
+            "args": [
+                "assembleDebug"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/android"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "run on android",
+            "type": "shell",
+            "command": "android",
+            "args": [
+                "run",
+                "--apks=${workspaceFolder}/android/app/build/outputs/apk/debug/app-debug.apk",
+                "--activity=org.libsdl.app.SDLActivity",
+                "--device=R3GL209LPTP"
+            ],
+            "dependsOn": "Build Android APK",
             "problemMatcher": []
         }
     ]
