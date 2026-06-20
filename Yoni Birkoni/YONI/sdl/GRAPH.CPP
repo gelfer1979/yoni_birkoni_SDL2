@@ -108,7 +108,42 @@ HDC valloc(int vnum) {
 }
 
 void vfree() {
-    g_active_surface = nullptr;
+    g_active_surface = g_screen;
+}
+
+extern bool g_joystick_active;
+extern float g_joystick_center_x, g_joystick_center_y;
+extern float g_joystick_curr_x, g_joystick_curr_y;
+
+static void draw_circle_renderer(SDL_Renderer* renderer, int x, int y, int radius, Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, r, g, b, a);
+    
+    for (int w = 0; w < radius * 2; w++) {
+        for (int h = 0; h < radius * 2; h++) {
+            int dx = radius - w;
+            int dy = radius - h;
+            int dist_sq = dx * dx + dy * dy;
+            if (dist_sq >= (radius - 2) * (radius - 2) && dist_sq <= radius * radius) {
+                SDL_RenderDrawPoint(renderer, x + dx, y + dy);
+            }
+        }
+    }
+}
+
+static void draw_filled_circle_renderer(SDL_Renderer* renderer, int x, int y, int radius, Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, r, g, b, a);
+    
+    for (int w = 0; w < radius * 2; w++) {
+        for (int h = 0; h < radius * 2; h++) {
+            int dx = radius - w;
+            int dy = radius - h;
+            if (dx * dx + dy * dy <= radius * radius) {
+                SDL_RenderDrawPoint(renderer, x + dx, y + dy);
+            }
+        }
+    }
 }
 
 bool flip(int numpage) {
@@ -121,7 +156,7 @@ bool flip(int numpage) {
         g_page1_dirty = false;
     }
     
-    if (!g_screen_dirty) return true;
+    if (!g_screen_dirty && !g_joystick_active) return true;
     g_screen_dirty = false;
     
     SDL_Texture* texture = SDL_CreateTextureFromSurface(g_renderer, g_screen);
@@ -129,6 +164,14 @@ bool flip(int numpage) {
     
     SDL_RenderClear(g_renderer);
     SDL_RenderCopy(g_renderer, texture, nullptr, nullptr);
+    
+    if (g_joystick_active) {
+        // Draw outer ring (cyan, slightly transparent)
+        draw_circle_renderer(g_renderer, (int)g_joystick_center_x, (int)g_joystick_center_y, 50, 0, 242, 254, 80);
+        // Draw inner filled knob (cyan, more opaque)
+        draw_filled_circle_renderer(g_renderer, (int)g_joystick_curr_x, (int)g_joystick_curr_y, 20, 0, 242, 254, 130);
+    }
+    
     SDL_RenderPresent(g_renderer);
     
     SDL_DestroyTexture(texture);
@@ -384,17 +427,18 @@ int getpixel(int sx, int sy) {
 }
 
 bool loadbmp(int mx, int my, const char *mpath) {
-    if (!g_active_surface || !mpath) return false;
+    SDL_Surface* target = g_active_surface ? g_active_surface : g_screen;
+    if (!target || !mpath) return false;
     SDL_Surface* bmp = SDL_LoadBMP(normalize_path(mpath).c_str());
     if (!bmp) return false;
     
-    SDL_Surface* converted = SDL_ConvertSurface(bmp, g_active_surface->format, 0);
+    SDL_Surface* converted = SDL_ConvertSurface(bmp, target->format, 0);
     SDL_FreeSurface(bmp);
     if (!converted) return false;
     
     SDL_Rect dst = { mx, my, converted->w, converted->h };
-    SDL_BlitSurface(converted, nullptr, g_active_surface, &dst);
-    mark_dirty(g_active_surface);
+    SDL_BlitSurface(converted, nullptr, target, &dst);
+    mark_dirty(target);
     SDL_FreeSurface(converted);
     return true;
 }

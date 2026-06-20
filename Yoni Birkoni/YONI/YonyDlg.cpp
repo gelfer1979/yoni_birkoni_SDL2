@@ -92,6 +92,7 @@ char hisctmp[1024];//path to temp directory (hiscores)
 char optionstmp[1024];//path to temp directory (current level)
 char curlevel[1024];//path to temp directory (current level)
 bool first=true;//first run
+bool g_exit_to_menu = false;
 int nbitmap;//bitmap than used to restore screen
 bool putopt,playnow=false;
 int ibm1,ibm2,ibm3;
@@ -115,6 +116,9 @@ bool enters(char *e)
 
 {
 	clear_page1_dirty();
+#ifdef SDL_INPUT_H
+	start_text_input();
+#endif
 	int k,z;
 	strcpy(e,"");
 	do{
@@ -141,6 +145,9 @@ bool enters(char *e)
 			putsprite(315,320,zast[1][1],0);
 		}
 	}while ((k!=0x01)&&(k!=0x1c)&&(k!=0x9c));
+#ifdef SDL_INPUT_H
+	stop_text_input();
+#endif
 	if (strlen(e)==0) strcpy(e,"noname");
 	if (k==0x01) return false; else return true;
 }
@@ -429,10 +436,10 @@ void loadimages ()
 		num[i]=loadbmptoptr(ld);
 	}
 	//load char's
-	strcpy(ld,"chara.gra");
+	strcpy(ld,"charA.gra");
 	for (i=0;i<26;i++)
 	{
-		ld[4]='a'+i;
+		ld[4] = (i == ('i' - 'a')) ? 'i' : ('A' + i);
 		c[i]=loadbmptoptr(ld);
 	}
 
@@ -535,10 +542,10 @@ void reloadimages()
 		reloadbmptoptr(num[i],ld);
 	}
 	//load char's
-	strcpy(ld,"chara.gra");
+	strcpy(ld,"charA.gra");
 	for (i=0;i<26;i++)
 	{
-		ld[4]='a'+i;
+		ld[4] = (i == ('i' - 'a')) ? 'i' : ('A' + i);
 		reloadbmptoptr(c[i],ld);
 	}
 
@@ -753,7 +760,10 @@ void filltable(bool norest)
 			if ((board[i][i1]==2)&&norest) acount++;
 		}
 	// draw words score and bonus
-	virtputsprite(10, 0, scim, bi);
+	virtputsprite(10, 0, c['e' - 'a'], bi);
+	virtputsprite(35, 0, c['s' - 'a'], bi);
+	virtputsprite(60, 0, c['c' - 'a'], bi);
+	virtputsprite(110, 0, scim, bi);
 	virtputsprite(400, 0, bonp, bi);
 
 	putimagetoscreen(0, 0, 799, 599, 0, 0, bi, 1);
@@ -813,7 +823,7 @@ void StartLevel()
 
 	lv.Format("%d\\",lnum);
 	//if level not exist -> go to main screen
-	if (GetFileAttributes(lv)==0xFFFFFFFF) {lnum=0;lock=true;ShowCursor(true);bg();return;}
+	if (GetFileAttributes(lv)==0xFFFFFFFF) {lnum=0;lock=true;ShowCursor(true);g_exit_to_menu = true;return;}
 	//load map
 	if (fl.Open(lv+"1.dat",CFile::modeRead))
 	{
@@ -858,7 +868,7 @@ void StartLevel()
 
 	//wait for player start
 	putsprite(0,315,enter,0);
-	showscore(200,0,score);
+	showscore(290,0,score);
 	showscore(475,0,bonus);
 
 	waitforent();
@@ -914,9 +924,9 @@ bool eat(int kmy, int kmx, bool player)//if apple was eaten
 			score+=bonus;
 			bonus=0;
 			//clear place of score
-			putimagetoscreen(200,0,399,31,200,0,bi,0);
+			putimagetoscreen(290,0,399,31,290,0,bi,0);
 			//show score
-			showscore(200,0,score);
+			showscore(290,0,score);
 			StartLevel();
 			return true;
 		 }
@@ -943,9 +953,9 @@ bool eat(int kmy, int kmx, bool player)//if apple was eaten
 				if ((!bufplaying(s[10]))&&(!bufplaying(s[2]))&&(!bufplaying(s[0]))) playbuf(s[3],false);
 			}
 			//clear place of score
-			putimagetoscreen(200,0,399,31,200,0,bi,0);
+			putimagetoscreen(290,0,399,31,290,0,bi,0);
 			//show score
-			showscore(200,0,score);
+			showscore(290,0,score);
 		}
 		return false;
 }
@@ -982,7 +992,7 @@ void CALLBACK EXPORT TimerProc1(HWND, UINT, UINT, DWORD)
 		if (!lock) 
 		{
 			ShowCursor(true);
-			bg();
+			g_exit_to_menu = true;
 		}
 		/*else if (gpause)
 		{
@@ -1031,7 +1041,7 @@ void CALLBACK EXPORT TimerProc1(HWND, UINT, UINT, DWORD)
 				waitforent(); 
 				//---------------
 				ShowCursor(true);
-				bg();
+				g_exit_to_menu = true;
 				return;
 			}
 		}
@@ -1618,9 +1628,9 @@ void CALLBACK EXPORT TimerProc1(HWND, UINT, UINT, DWORD)
 		//show score on screen 
 		// 
 		//clear place of score
-		putimagetoscreen(200, 0, 399, 31, 200, 0, bi, 1);
+		putimagetoscreen(290, 0, 399, 31, 290, 0, bi, 1);
 		//show score
-		showscore(200, 0, score);
+		showscore(290, 0, score);
 		//show lives
 		showh();
 
@@ -1632,20 +1642,27 @@ void newgame()
 {
 	score=0;score1=0;
 	hcount=3;
-StartLevel();
-//::SetTimer(mwnd,1,tcount,&TimerProc1);
-DWORD dwStartTime=GetTickCount();
-DWORD dwTempTime;
-do{
-			dwTempTime=GetTickCount();
-			if (dwTempTime>=dwStartTime) 
+	g_exit_to_menu = false;
+	StartLevel();
+	if (g_exit_to_menu) return;
+	//::SetTimer(mwnd,1,tcount,&TimerProc1);
+	DWORD dwStartTime=GetTickCount();
+	DWORD dwTempTime;
+	do{
+		dwTempTime=GetTickCount();
+		if (dwTempTime>=dwStartTime) 
+		{
+			if ((dwTempTime-dwStartTime)>=tcount)
 			{
-				if ((dwTempTime-dwStartTime)>=tcount)
-				{dwStartTime=dwTempTime;TimerProc1(NULL,0,0,0);}
+				dwStartTime=dwTempTime;
+				TimerProc1(NULL,0,0,0);
+				if (g_exit_to_menu) break;
 			}
-			else dwStartTime=0;
-			PeekAndPump();
-		}while (g_bTimerWorking);
+		}
+		else dwStartTime=0;
+		PeekAndPump();
+		if (g_exit_to_menu) break;
+	}while (g_bTimerWorking);
 }
 
 
@@ -1816,15 +1833,39 @@ void begingame()
 				switch (ns)//select from menu
 				{
 					//begin new game
-				case 0:passw = true; newgame(); return;
+				case 0:passw = true; return;
 					//SELECT NEW GAME
 				case 1:
 					{
+#ifdef SDL_INPUT_H
+						g_select_new_game_active = true;
+#endif
+						ShowCursor(true);
 						putopt=false;
 						loadbmp(0,0,"greenscr.gra");
 						int passimg=loadbmptoptr("pass.gra");
 						putsprite(130,400,passimg,0);
 						prelease();
+
+						valloc(0);
+						setfillcolor(0x00009600); // Green fill: RGB(0, 150, 0)
+						bar(200, 480, 380, 530);
+						setcolor(0x00FFFFFF); // White border/text: RGB(255, 255, 255)
+						rectangle(200, 480, 380, 530);
+
+						setfillcolor(0x000000B4); // Red fill: RGB(180, 0, 0)
+						bar(420, 480, 600, 530);
+						setcolor(0x00FFFFFF); // White border/text
+						rectangle(420, 480, 600, 530);
+						vfree();
+
+						// Draw button text using sprite characters
+						putsprite(245, 490, c['y' - 'a'], 0);
+						putsprite(275, 490, c['e' - 'a'], 0);
+						putsprite(305, 490, c['s' - 'a'], 0);
+
+						putsprite(480, 490, c['n' - 'a'], 0);
+						putsprite(510, 490, c['o' - 'a'], 0);
 						
 						//vait for y or n
 						bool ddone = false;
@@ -1839,13 +1880,17 @@ void begingame()
 									fl.Close();
 								}
 								ddone = true;
-							} else if (k == 0x31 || k == 0x01) { // 'N' or ESC
+							} else if (k == 0x01) { // ESC
 								ddone = true;
 							}
 							Sleep(50); // wait 50 msec
 						}
 						
 						putopt=true;
+						ShowCursor(false);
+#ifdef SDL_INPUT_H
+						g_select_new_game_active = false;
+#endif
 						//put first screen back 
 						reloadbmptoptr(bi, "begin.gra");
 						for (i = 0; i < 6; i++) virtputsprite(315, 270 + i * 50, zast[i][0], bi);
@@ -2011,11 +2056,38 @@ void  CPackmanDlg::OnPaint()
 				putsprite(0,320,enter,0);
 
 				//clear place of score
-				putimagetoscreen(200,0,399,31,200,0,bi,1);
+				putimagetoscreen(290,0,399,31,290,0,bi,1);
 				//show score
-				showscore(200,0,score);
+				showscore(290,0,score);
 				//show lifes
 				showscore(475,0,bonus);
+			}
+			else if (g_select_new_game_active)
+			{
+				loadbmp(0,0,"greenscr.gra");
+				int passimg=loadbmptoptr("pass.gra");
+				putsprite(130,400,passimg,0);
+				prelease();
+
+				valloc(0);
+				setfillcolor(0x00009600); // Green fill: RGB(0, 150, 0)
+				bar(200, 480, 380, 530);
+				setcolor(0x00FFFFFF); // White border/text: RGB(255, 255, 255)
+				rectangle(200, 480, 380, 530);
+
+				setfillcolor(0x000000B4); // Red fill: RGB(180, 0, 0)
+				bar(420, 480, 600, 530);
+				setcolor(0x00FFFFFF); // White border/text
+				rectangle(420, 480, 600, 530);
+				vfree();
+
+				// Draw button text using sprite characters
+				putsprite(245, 490, c['y' - 'a'], 0);
+				putsprite(275, 490, c['e' - 'a'], 0);
+				putsprite(305, 490, c['s' - 'a'], 0);
+
+				putsprite(480, 490, c['n' - 'a'], 0);
+				putsprite(510, 490, c['o' - 'a'], 0);
 			}
 			else
 			{

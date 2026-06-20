@@ -6,7 +6,16 @@
 const int lbutton = 12, rbutton = 13, mbutton = 14,
           mousex = 0, mousey = 4, moverflow = -1;
 
+// Joystick states for touch control
+extern bool g_joystick_active;
+extern float g_joystick_center_x, g_joystick_center_y;
+extern float g_joystick_curr_x, g_joystick_curr_y;
+extern int g_joystick_dir;
+extern bool g_select_new_game_active;
 
+void input_push_simulated_key(unsigned char dik, bool is_down);
+void start_text_input();
+void stop_text_input();
 
 bool initdinput();
 bool initmouse(void *mwnd, bool mlevel, int mbuffersize, bool axismode);

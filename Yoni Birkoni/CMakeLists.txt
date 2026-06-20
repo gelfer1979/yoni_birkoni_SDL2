@@ -76,6 +76,14 @@ if(EMSCRIPTEN)
     
     # Output file extension
     set_target_properties(yony PROPERTIES SUFFIX ".html")
+    
+    # Automatically copy yony.html to index.html for itch.io and local server
+    add_custom_command(TARGET yony POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "$<TARGET_FILE_DIR:yony>/yony.html"
+        "$<TARGET_FILE_DIR:yony>/index.html"
+        COMMENT "Copying yony.html to index.html for Web/itch.io entry point"
+    )
 
 elseif(ANDROID)
     # Android target (Shared library)

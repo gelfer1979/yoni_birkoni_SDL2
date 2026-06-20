@@ -167,8 +167,19 @@ inline std::string normalize_path(const std::string& path) {
       return (void*)32;
   }
   
+  extern bool g_joystick_active;
+  extern int g_joystick_dir;
+
   #define SHORT short
   inline short GetAsyncKeyState(int vKey) {
+      if (g_joystick_active) {
+          bool match = false;
+          if (vKey == 0x25 && g_joystick_dir == 1) match = true; // LEFT
+          if (vKey == 0x26 && g_joystick_dir == 2) match = true; // UP
+          if (vKey == 0x27 && g_joystick_dir == 3) match = true; // RIGHT
+          if (vKey == 0x28 && g_joystick_dir == 4) match = true; // DOWN
+          if (match) return (short)0x8000;
+      }
       const Uint8* state = SDL_GetKeyboardState(nullptr);
       SDL_Scancode sc = SDL_SCANCODE_UNKNOWN;
       switch (vKey) {
@@ -280,7 +291,12 @@ inline std::string normalize_path(const std::string& path) {
   #define RUSSIAN_CHARSET 204
   
   inline int ShowCursor(BOOL bShow) {
+#ifdef __EMSCRIPTEN__
+      (void)bShow;
+      return SDL_ShowCursor(SDL_ENABLE);
+#else
       return SDL_ShowCursor(bShow ? SDL_ENABLE : SDL_DISABLE);
+#endif
   }
   
   inline void Sleep(DWORD dwMilliseconds) {

@@ -149,6 +149,30 @@ static size_t g_key_event_idx = 0;
 // Pressed key code queue for getkey()
 static std::queue<int> g_pressed_keys;
 
+// Joystick states for touch control
+bool g_joystick_active = false;
+float g_joystick_center_x = 0.0f;
+float g_joystick_center_y = 0.0f;
+float g_joystick_curr_x = 0.0f;
+float g_joystick_curr_y = 0.0f;
+int g_joystick_dir = 0;
+bool g_select_new_game_active = false;
+
+void input_push_simulated_key(unsigned char dik, bool is_down) {
+    if (is_down) {
+        g_pressed_keys.push(dik);
+    }
+    g_key_events.push_back({ (int)dik, is_down });
+}
+
+void start_text_input() {
+    SDL_StartTextInput();
+}
+
+void stop_text_input() {
+    SDL_StopTextInput();
+}
+
 // Public event helper called by main loop
 void input_push_key_event(SDL_Scancode scancode, bool is_down) {
     unsigned char dik = sdl_to_dik(scancode);
@@ -265,6 +289,8 @@ void resetkeyboard() {
     while (!g_pressed_keys.empty()) g_pressed_keys.pop();
     g_key_events.clear();
     g_key_event_idx = 0;
+    g_joystick_active = false;
+    g_joystick_dir = 0;
 }
 
 void closekeyboard() {
