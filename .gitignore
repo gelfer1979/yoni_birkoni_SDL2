@@ -23,7 +23,6 @@
 *.dll
 *.so.*
 
-
 # Fortran module files
 *.mod
 *.smod
@@ -43,6 +42,11 @@
 build/
 Build/
 build-*/
+build_wasm/
+build_android/
+
+# Emscripten SDK (downloaded and managed locally)
+emsdk/
 
 # CMake generated files
 CMakeFiles/
@@ -52,11 +56,14 @@ Makefile
 install_manifest.txt
 compile_commands.json
 
-# Temporary files
+# Temporary, cache and log files
 *.tmp
 *.log
 *.bak
 *.swp
+build_log.txt
+.cache/
+Testing/
 
 # vcpkg
 vcpkg_installed/
@@ -64,6 +71,12 @@ vcpkg_installed/
 # debug information files
 *.dwo
 
-# test output & cache
-Testing/
-.cache/
+# IDE files
+.vscode/tasks.log
+*.suo
+*.user
+
+# OS-specific files
+Thumbs.db
+desktop.ini
+.DS_Store
