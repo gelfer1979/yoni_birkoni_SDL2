@@ -452,20 +452,128 @@ inline CWinApp* AfxGetApp() {
     return &app;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <vector>
+#include <cstring>
+
+inline std::string bytes_to_hex(const std::vector<char>& bytes) {
+    std::string hex;
+    hex.reserve(bytes.size() * 2);
+    for (char b : bytes) {
+        char buf[3];
+        sprintf(buf, "%02x", (unsigned char)b);
+        hex += buf;
+    }
+    return hex;
+}
+
+inline std::vector<char> hex_to_bytes(const std::string& hex) {
+    std::vector<char> bytes;
+    bytes.reserve(hex.size() / 2);
+    for (size_t i = 0; i < hex.size(); i += 2) {
+        if (i + 1 < hex.size()) {
+            std::string byteString = hex.substr(i, 2);
+            char byte = (char)strtol(byteString.c_str(), nullptr, 16);
+            bytes.push_back(byte);
+        }
+    }
+    return bytes;
+}
+#endif
+
 // MFC CFile stub
 class CFile {
 private:
     FILE* f;
+#ifdef __EMSCRIPTEN__
+    bool is_local_storage_file;
+    std::string ls_key;
+    std::vector<char> ls_buffer;
+    size_t ls_pos;
+    bool ls_write_mode;
+#endif
+
 public:
     static const UINT modeRead = 1;
     static const UINT modeWrite = 2;
     static const UINT modeCreate = 4;
     static const UINT typeBinary = 8;
     
-    CFile() : f(nullptr) {}
+    CFile() : f(nullptr) 
+#ifdef __EMSCRIPTEN__
+    , is_local_storage_file(false), ls_pos(0), ls_write_mode(false)
+#endif
+    {}
     ~CFile() { Close(); }
     
     BOOL Open(LPCSTR lpszFileName, UINT nOpenFlags) {
+#ifdef __EMSCRIPTEN__
+        std::string filename = normalize_path(lpszFileName);
+        is_local_storage_file = false;
+        ls_write_mode = (nOpenFlags & modeWrite) || (nOpenFlags & modeCreate);
+        
+        if (filename.find("options.dat") != std::string::npos) {
+            is_local_storage_file = true;
+            ls_key = "yoni_options";
+        } else if (filename.find("curlevel.dat") != std::string::npos) {
+            is_local_storage_file = true;
+            ls_key = "yoni_curlevel";
+        } else if (filename.find("hiscore.dat") != std::string::npos) {
+            is_local_storage_file = true;
+            ls_key = "yoni_hiscore";
+        }
+
+        if (is_local_storage_file) {
+            ls_buffer.clear();
+            ls_pos = 0;
+            
+            int exists = EM_ASM_INT({
+                try {
+                    return localStorage.getItem(UTF8ToString($0)) !== null ? 1 : 0;
+                } catch(e) {
+                    return 0;
+                }
+            }, ls_key.c_str());
+            
+            if (exists) {
+                char temp_hex[4096] = {0};
+                EM_ASM({
+                    try {
+                        var val = localStorage.getItem(UTF8ToString($0)) || "";
+                        stringToUTF8(val, $1, $2);
+                    } catch(e) {}
+                }, ls_key.c_str(), temp_hex, (int)sizeof(temp_hex));
+                
+                ls_buffer = hex_to_bytes(temp_hex);
+            } else {
+                // Try reading default file if it exists in MEMFS
+                FILE* default_f = fopen(filename.c_str(), "rb");
+                if (default_f) {
+                    char buf[1024];
+                    size_t bytes_read;
+                    while ((bytes_read = fread(buf, 1, sizeof(buf), default_f)) > 0) {
+                        ls_buffer.insert(ls_buffer.end(), buf, buf + bytes_read);
+                    }
+                    fclose(default_f);
+                    
+                    std::string hex = bytes_to_hex(ls_buffer);
+                    EM_ASM({
+                        try {
+                            localStorage.setItem(UTF8ToString($0), UTF8ToString($1));
+                        } catch(e) {}
+                    }, ls_key.c_str(), hex.c_str());
+                }
+            }
+            
+            if (nOpenFlags & modeCreate) {
+                ls_buffer.clear();
+            }
+            
+            return TRUE;
+        }
+#endif
+
         char mode[8] = "";
         if (nOpenFlags & modeCreate) {
             if (nOpenFlags & modeRead) strcpy(mode, "w+b");
@@ -479,15 +587,52 @@ public:
     }
     
     UINT Read(void* lpBuf, UINT nCount) {
+#ifdef __EMSCRIPTEN__
+        if (is_local_storage_file) {
+            if (ls_pos >= ls_buffer.size()) return 0;
+            size_t bytes_to_read = nCount;
+            if (ls_pos + bytes_to_read > ls_buffer.size()) {
+                bytes_to_read = ls_buffer.size() - ls_pos;
+            }
+            std::memcpy(lpBuf, &ls_buffer[ls_pos], bytes_to_read);
+            ls_pos += bytes_to_read;
+            return (UINT)bytes_to_read;
+        }
+#endif
         if (!f) return 0;
         return (UINT)fread(lpBuf, 1, nCount, f);
     }
     
     void Write(const void* lpBuf, UINT nCount) {
+#ifdef __EMSCRIPTEN__
+        if (is_local_storage_file) {
+            if (ls_pos + nCount > ls_buffer.size()) {
+                ls_buffer.resize(ls_pos + nCount);
+            }
+            std::memcpy(&ls_buffer[ls_pos], lpBuf, nCount);
+            ls_pos += nCount;
+            return;
+        }
+#endif
         if (f) fwrite(lpBuf, 1, nCount, f);
     }
     
     void Close() {
+#ifdef __EMSCRIPTEN__
+        if (is_local_storage_file) {
+            if (ls_write_mode) {
+                std::string hex = bytes_to_hex(ls_buffer);
+                EM_ASM({
+                    try {
+                        localStorage.setItem(UTF8ToString($0), UTF8ToString($1));
+                    } catch(e) {}
+                }, ls_key.c_str(), hex.c_str());
+            }
+            is_local_storage_file = false;
+            ls_buffer.clear();
+            return;
+        }
+#endif
         if (f) {
             fclose(f);
             f = nullptr;
@@ -495,6 +640,11 @@ public:
     }
     
     unsigned long GetLength() {
+#ifdef __EMSCRIPTEN__
+        if (is_local_storage_file) {
+            return (unsigned long)ls_buffer.size();
+        }
+#endif
         if (!f) return 0;
         long current = ftell(f);
         fseek(f, 0, SEEK_END);
