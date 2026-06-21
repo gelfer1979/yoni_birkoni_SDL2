@@ -43,7 +43,21 @@ build/
 Build/
 build-*/
 build_wasm/
-build_android/
+# Ignore CMake build artifacts in build_android but track Gradle files
+build_android/CMakeFiles/
+build_android/CMakeCache.txt
+build_android/cmake_install.cmake
+build_android/build.ninja
+build_android/.ninja_deps
+build_android/.ninja_log
+build_android/CPackConfig.cmake
+build_android/CPackSourceConfig.cmake
+build_android/SDL2/
+build_android/SDL2_mixer/
+build_android/SDL2_ttf/
+build_android/YoniBirkoni/
+build_android/lib/
+build_android/staging/
 
 # Emscripten SDK (downloaded and managed locally)
 emsdk/

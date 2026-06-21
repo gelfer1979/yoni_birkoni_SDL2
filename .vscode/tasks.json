@@ -101,12 +101,12 @@
         {
             "label": "Build Android APK",
             "type": "shell",
-            "command": "${workspaceFolder}/android/gradlew.bat",
+            "command": "${workspaceFolder}/build_android/gradlew.bat",
             "args": [
                 "assembleDebug"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/android"
+                "cwd": "${workspaceFolder}/build_android"
             },
             "group": {
                 "kind": "build",
@@ -120,7 +120,7 @@
             "command": "android",
             "args": [
                 "run",
-                "--apks=${workspaceFolder}/android/app/build/outputs/apk/debug/app-debug.apk",
+                "--apks=${workspaceFolder}/build_android/app/build/outputs/apk/debug/app-debug.apk",
                 "--activity=org.libsdl.app.SDLActivity",
                 "--device=R3GL209LPTP"
             ],
