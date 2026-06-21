@@ -18,10 +18,16 @@ static inline Mix_Chunk* get_chunk(unsigned long int nbuf) {
 bool initsound(HWND hwnd, unsigned long int daccess, unsigned long numbuf) {
     (void)hwnd; (void)daccess;
     
-    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) return false;
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
+        printf("Error: SDL_InitSubSystem(SDL_INIT_AUDIO) failed: %s\n", SDL_GetError());
+        return false;
+    }
     
     // Initialize SDL_mixer
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) return false;
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        printf("Error: Mix_OpenAudio failed: %s\n", Mix_GetError());
+        return false;
+    }
     
     // Initialize SDL_mixer formats (MP3 support)
     int flags = MIX_INIT_MP3;
@@ -36,6 +42,7 @@ bool initsound(HWND hwnd, unsigned long int daccess, unsigned long numbuf) {
     buffer_panning.assign(numbuf + 1, 127);  // Standard center panning
     
     audio_initialized = true;
+    printf("Info: Sound initialized successfully. Buffers allocated: %lu\n", numbuf);
     return true;
 }
 
@@ -58,8 +65,12 @@ void closesound() {
 
 unsigned long int loadwav(const char *mpath) {
     if (!mpath) return 0;
-    Mix_Chunk* chunk = Mix_LoadWAV(normalize_path(mpath).c_str());
-    if (!chunk) return 0;
+    std::string norm_path = normalize_path(mpath);
+    Mix_Chunk* chunk = Mix_LoadWAV(norm_path.c_str());
+    if (!chunk) {
+        printf("Error: Failed to load sound effect: %s, normalized: %s, error: %s\n", mpath, norm_path.c_str(), Mix_GetError());
+        return 0;
+    }
     
     // Find free slot
     for (size_t i = 1; i < wav_buffers.size(); ++i) {
@@ -68,6 +79,7 @@ unsigned long int loadwav(const char *mpath) {
             buffer_channels[i] = -1;
             buffer_volumes[i] = 128;
             buffer_panning[i] = 127;
+            printf("Info: Loaded sound effect %s to slot %zu\n", mpath, i);
             return (unsigned long int)i;
         }
     }
@@ -76,6 +88,7 @@ unsigned long int loadwav(const char *mpath) {
     buffer_channels.push_back(-1);
     buffer_volumes.push_back(128);
     buffer_panning.push_back(127);
+    printf("Info: Loaded sound effect %s to new slot %zu\n", mpath, wav_buffers.size() - 1);
     return (unsigned long int)(wav_buffers.size() - 1);
 }
 
@@ -92,7 +105,10 @@ unsigned long int getbufsize(unsigned long int nbuf) {
 
 bool playbuf(unsigned long int nbuf, bool mloop) {
     Mix_Chunk* chunk = get_chunk(nbuf);
-    if (!chunk) return false;
+    if (!chunk) {
+        printf("Warning: Attempted to play uninitialized sound buffer %lu\n", nbuf);
+        return false;
+    }
     
     int channel = Mix_PlayChannel(-1, chunk, mloop ? -1 : 0);
     if (channel != -1) {
@@ -106,6 +122,8 @@ bool playbuf(unsigned long int nbuf, bool mloop) {
             Mix_SetPanning(channel, left, right);
         }
         return true;
+    } else {
+        printf("Warning: Mix_PlayChannel failed for buffer %lu: %s\n", nbuf, Mix_GetError());
     }
     return false;
 }

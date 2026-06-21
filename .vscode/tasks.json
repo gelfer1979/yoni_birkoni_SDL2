@@ -38,6 +38,16 @@
             "problemMatcher": "$gcc"
         },*/
         {
+            "label": "Configure Linux",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-B",
+                "${workspaceFolder}/build_linux"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "Build Linux",
             "type": "shell",
             "command": "cmake",
@@ -45,8 +55,21 @@
                 "--build",
                 "${workspaceFolder}/build_linux"
             ],
+            "dependsOn": [
+                "Configure Linux"
+            ],
             "group": "build",
             "problemMatcher": "$gcc"
+        },
+        {
+            "label": "Configure macOS",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-B",
+                "${workspaceFolder}/build_macos"
+            ],
+            "problemMatcher": []
         },
         {
             "label": "Build macOS",
@@ -55,6 +78,9 @@
             "args": [
                 "--build",
                 "${workspaceFolder}/build_macos"
+            ],
+            "dependsOn": [
+                "Configure macOS"
             ],
             "group": "build",
             "problemMatcher": "$gcc"

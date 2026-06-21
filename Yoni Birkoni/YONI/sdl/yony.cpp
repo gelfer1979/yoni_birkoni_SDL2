@@ -8,6 +8,9 @@
 #undef protected
 
 #include <cmath>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -86,13 +89,19 @@ static void update_joystick_drag(float curr_x, float curr_y) {
 
 // PeekAndPump handles the event loop and passes inputs to MFC message handlers
 BOOL PeekAndPump() {
+    static Uint32 startup_ticks = 0;
+    if (startup_ticks == 0) {
+        startup_ticks = SDL_GetTicks();
+    }
+    bool is_startup = (SDL_GetTicks() - startup_ticks < 500);
+
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
                 closegraph();
-                closesound();
                 dsclose();
+                closesound();
                 std::exit(0);
                 break;
                 
@@ -111,12 +120,14 @@ BOOL PeekAndPump() {
 
             case SDL_KEYDOWN:
             case SDL_KEYUP:
-                input_push_key_event(event.key.keysym.scancode, event.type == SDL_KEYDOWN);
+                if (!is_startup) {
+                    input_push_key_event(event.key.keysym.scancode, event.type == SDL_KEYDOWN);
+                }
                 break;
                 
             case SDL_FINGERDOWN:
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-                {
+                if (!is_startup) {
                     float lx, ly;
                     finger_to_logical(event.tfinger.x, event.tfinger.y, lx, ly);
                     
@@ -140,7 +151,7 @@ BOOL PeekAndPump() {
                 
             case SDL_FINGERMOTION:
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-                if (g_joystick_active && !g_touch_is_esc) {
+                if (!is_startup && g_joystick_active && !g_touch_is_esc) {
                     float lx, ly;
                     finger_to_logical(event.tfinger.x, event.tfinger.y, lx, ly);
                     update_joystick_drag(lx, ly);
@@ -150,88 +161,22 @@ BOOL PeekAndPump() {
                 
             case SDL_FINGERUP:
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-                if (g_touch_is_esc) {
-                    float tx, ty;
-                    finger_to_logical(event.tfinger.x, event.tfinger.y, tx, ty);
-                    if (tx >= 5.0f && tx <= 160.0f && ty >= 0.0f && ty <= 85.0f) {
-                        input_push_simulated_key(0x01, true); // ESC
-                    }
-                    g_touch_is_esc = false;
-                    g_joystick_dirty = true;
-                } else if (g_joystick_active) {
-                    float tx, ty;
-                    finger_to_logical(event.tfinger.x, event.tfinger.y, tx, ty);
-                    float dx = tx - g_joystick_center_x;
-                    float dy = ty - g_joystick_center_y;
-                    float dist = std::sqrt(dx * dx + dy * dy);
-                    if (!g_joystick_has_moved || dist < 30.0f) {
-                        if (g_select_new_game_active) {
-                            if (ty >= 480.0f && ty <= 530.0f) {
-                                if (tx >= 200.0f && tx <= 380.0f) {
-                                    input_push_simulated_key(0x15, true); // 'Y' (Yes)
-                                } else if (tx >= 420.0f && tx <= 600.0f) {
-                                    input_push_simulated_key(0x01, true); // ESC (Cancel)
-                                } else {
-                                    input_push_simulated_key(0x1C, true); // ENTER (tap elsewhere)
-                                }
-                            } else {
-                                input_push_simulated_key(0x1C, true); // ENTER (tap elsewhere)
-                            }
-                        } else {
-                            // Check if the tap is within the main menu buttons bounds
-                            if (tx >= 315.0f && tx <= 530.0f) {
-                                int tapped_ns = -1;
-                                if (ty >= 270.0f && ty <= 300.0f) tapped_ns = 0;
-                                else if (ty >= 320.0f && ty <= 350.0f) tapped_ns = 1;
-                                else if (ty >= 370.0f && ty <= 400.0f) tapped_ns = 2;
-                                else if (ty >= 420.0f && ty <= 450.0f) tapped_ns = 3;
-                                else if (ty >= 470.0f && ty <= 500.0f) tapped_ns = 4;
-                                else if (ty >= 520.0f && ty <= 550.0f) tapped_ns = 5;
-                                
-                                if (tapped_ns != -1) {
-                                    extern int ns;
-                                    ns = tapped_ns;
-                                    input_push_simulated_key(0x1C, true); // ENTER
-                                }
-                            }
+                if (!is_startup) {
+                    if (g_touch_is_esc) {
+                        float tx, ty;
+                        finger_to_logical(event.tfinger.x, event.tfinger.y, tx, ty);
+                        if (tx >= 5.0f && tx <= 160.0f && ty >= 0.0f && ty <= 85.0f) {
+                            input_push_simulated_key(0x01, true); // ESC
                         }
-                    }
-                    g_joystick_active = false;
-                    g_joystick_dir = 0;
-                    g_joystick_dirty = true;
-                }
-#endif
-                break;
-                
-#if defined(__EMSCRIPTEN__)
-            case SDL_MOUSEBUTTONDOWN:
-                if (event.button.button == SDL_BUTTON_LEFT) {
-                    g_joystick_active = true;
-                    g_joystick_center_x = (float)event.button.x;
-                    g_joystick_center_y = (float)event.button.y;
-                    g_joystick_curr_x = g_joystick_center_x;
-                    g_joystick_curr_y = g_joystick_center_y;
-                    g_joystick_dir = 0;
-                    g_joystick_has_moved = false;
-                    theDlg.OnLButtonDown(0, CPoint(event.button.x, event.button.y));
-                }
-                input_push_mouse_button(event.button.button, true);
-                break;
-                
-            case SDL_MOUSEMOTION:
-                if (g_joystick_active) {
-                    update_joystick_drag((float)event.motion.x, (float)event.motion.y);
-                }
-                input_push_mouse_motion(event.motion.xrel, event.motion.yrel);
-                theDlg.OnMouseMove(0, CPoint(event.motion.x, event.motion.y));
-                break;
-                
-            case SDL_MOUSEBUTTONUP:
-                if (event.button.button == SDL_BUTTON_LEFT) {
-                    if (g_joystick_active) {
-                        if (!g_joystick_has_moved) {
-                            float tx = (float)event.button.x;
-                            float ty = (float)event.button.y;
+                        g_touch_is_esc = false;
+                        g_joystick_dirty = true;
+                    } else if (g_joystick_active) {
+                        float tx, ty;
+                        finger_to_logical(event.tfinger.x, event.tfinger.y, tx, ty);
+                        float dx = tx - g_joystick_center_x;
+                        float dy = ty - g_joystick_center_y;
+                        float dist = std::sqrt(dx * dx + dy * dy);
+                        if (!g_joystick_has_moved || dist < 30.0f) {
                             if (g_select_new_game_active) {
                                 if (ty >= 480.0f && ty <= 530.0f) {
                                     if (tx >= 200.0f && tx <= 380.0f) {
@@ -239,13 +184,11 @@ BOOL PeekAndPump() {
                                     } else if (tx >= 420.0f && tx <= 600.0f) {
                                         input_push_simulated_key(0x01, true); // ESC (Cancel)
                                     } else {
-                                        input_push_simulated_key(0x1C, true);
+                                        input_push_simulated_key(0x1C, true); // ENTER (tap elsewhere)
                                     }
                                 } else {
-                                    input_push_simulated_key(0x1C, true);
+                                    input_push_simulated_key(0x1C, true); // ENTER (tap elsewhere)
                                 }
-                            } else if (playnow && tx >= 10.0f && tx <= 100.0f && ty >= 0.0f && ty <= 40.0f) {
-                                input_push_simulated_key(0x01, true); // ESC
                             } else {
                                 // Check if the tap is within the main menu buttons bounds
                                 if (tx >= 315.0f && tx <= 530.0f) {
@@ -267,41 +210,123 @@ BOOL PeekAndPump() {
                         }
                         g_joystick_active = false;
                         g_joystick_dir = 0;
+                        g_joystick_dirty = true;
                     }
                 }
-                input_push_mouse_button(event.button.button, false);
+#endif
                 break;
-#else
+                
+#if defined(__EMSCRIPTEN__)
             case SDL_MOUSEBUTTONDOWN:
-                if (event.button.button == SDL_BUTTON_LEFT) {
-                    theDlg.OnLButtonDown(0, CPoint(event.button.x, event.button.y));
-                    float tx = (float)event.button.x;
-                    float ty = (float)event.button.y;
-
-                    SDL_Log("Click logical: %.1f, %.1f  g_new_game=%d playnow=%d",
-                            tx, ty, (int)g_select_new_game_active, (int)playnow);
-                    if (g_select_new_game_active) {
-                        if (ty >= 470.0f && ty <= 540.0f) {
-                            if (tx >= 190.0f && tx <= 390.0f) {
-                                input_push_simulated_key(0x15, true); // 'Y' (Yes)
-                            } else if (tx >= 410.0f && tx <= 610.0f) {
-                                input_push_simulated_key(0x01, true); // ESC (No/Cancel)
-                            }
-                        }
-                    } else if (playnow && tx >= 5.0f && tx <= 150.0f && ty >= 0.0f && ty <= 85.0f) {
-                        input_push_simulated_key(0x01, true); // ESC
+                if (!is_startup) {
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        g_joystick_active = true;
+                        g_joystick_center_x = (float)event.button.x;
+                        g_joystick_center_y = (float)event.button.y;
+                        g_joystick_curr_x = g_joystick_center_x;
+                        g_joystick_curr_y = g_joystick_center_y;
+                        g_joystick_dir = 0;
+                        g_joystick_has_moved = false;
+                        theDlg.OnLButtonDown(0, CPoint(event.button.x, event.button.y));
                     }
+                    input_push_mouse_button(event.button.button, true);
                 }
-                input_push_mouse_button(event.button.button, true);
                 break;
                 
             case SDL_MOUSEMOTION:
-                input_push_mouse_motion(event.motion.xrel, event.motion.yrel);
-                theDlg.OnMouseMove(0, CPoint(event.motion.x, event.motion.y));
+                if (!is_startup) {
+                    if (g_joystick_active) {
+                        update_joystick_drag((float)event.motion.x, (float)event.motion.y);
+                    }
+                    input_push_mouse_motion(event.motion.xrel, event.motion.yrel);
+                    theDlg.OnMouseMove(0, CPoint(event.motion.x, event.motion.y));
+                }
                 break;
                 
             case SDL_MOUSEBUTTONUP:
-                input_push_mouse_button(event.button.button, false);
+                if (!is_startup) {
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        if (g_joystick_active) {
+                            if (!g_joystick_has_moved) {
+                                float tx = (float)event.button.x;
+                                float ty = (float)event.button.y;
+                                if (g_select_new_game_active) {
+                                    if (ty >= 480.0f && ty <= 530.0f) {
+                                        if (tx >= 200.0f && tx <= 380.0f) {
+                                            input_push_simulated_key(0x15, true); // 'Y' (Yes)
+                                        } else if (tx >= 420.0f && tx <= 600.0f) {
+                                            input_push_simulated_key(0x01, true); // ESC (Cancel)
+                                        } else {
+                                            input_push_simulated_key(0x1C, true);
+                                        }
+                                    } else {
+                                        input_push_simulated_key(0x1C, true);
+                                    }
+                                } else if (playnow && tx >= 10.0f && tx <= 100.0f && ty >= 0.0f && ty <= 40.0f) {
+                                    input_push_simulated_key(0x01, true); // ESC
+                                } else {
+                                    // Check if the tap is within the main menu buttons bounds
+                                    if (tx >= 315.0f && tx <= 530.0f) {
+                                        int tapped_ns = -1;
+                                        if (ty >= 270.0f && ty <= 300.0f) tapped_ns = 0;
+                                        else if (ty >= 320.0f && ty <= 350.0f) tapped_ns = 1;
+                                        else if (ty >= 370.0f && ty <= 400.0f) tapped_ns = 2;
+                                        else if (ty >= 420.0f && ty <= 450.0f) tapped_ns = 3;
+                                        else if (ty >= 470.0f && ty <= 500.0f) tapped_ns = 4;
+                                        else if (ty >= 520.0f && ty <= 550.0f) tapped_ns = 5;
+                                        
+                                        if (tapped_ns != -1) {
+                                            extern int ns;
+                                            ns = tapped_ns;
+                                            input_push_simulated_key(0x1C, true); // ENTER
+                                        }
+                                    }
+                                }
+                            }
+                            g_joystick_active = false;
+                            g_joystick_dir = 0;
+                        }
+                    }
+                    input_push_mouse_button(event.button.button, false);
+                }
+                break;
+#else
+            case SDL_MOUSEBUTTONDOWN:
+                if (!is_startup) {
+                    if (event.button.button == SDL_BUTTON_LEFT) {
+                        theDlg.OnLButtonDown(0, CPoint(event.button.x, event.button.y));
+                        float tx = (float)event.button.x;
+                        float ty = (float)event.button.y;
+
+                        SDL_Log("Click logical: %.1f, %.1f  g_new_game=%d playnow=%d",
+                                tx, ty, (int)g_select_new_game_active, (int)playnow);
+                        if (g_select_new_game_active) {
+                            if (ty >= 470.0f && ty <= 540.0f) {
+                                if (tx >= 190.0f && tx <= 390.0f) {
+                                    input_push_simulated_key(0x15, true); // 'Y' (Yes)
+                                } else if (tx >= 410.0f && tx <= 610.0f) {
+                                    input_push_simulated_key(0x01, true); // ESC (No/Cancel)
+                                }
+                            }
+                        } else if (playnow && tx >= 5.0f && tx <= 150.0f && ty >= 0.0f && ty <= 85.0f) {
+                            input_push_simulated_key(0x01, true); // ESC
+                        }
+                    }
+                    input_push_mouse_button(event.button.button, true);
+                }
+                break;
+                
+            case SDL_MOUSEMOTION:
+                if (!is_startup) {
+                    input_push_mouse_motion(event.motion.xrel, event.motion.yrel);
+                    theDlg.OnMouseMove(0, CPoint(event.motion.x, event.motion.y));
+                }
+                break;
+                
+            case SDL_MOUSEBUTTONUP:
+                if (!is_startup) {
+                    input_push_mouse_button(event.button.button, false);
+                }
                 break;
 
 #endif
@@ -325,6 +350,16 @@ BOOL PeekAndPump() {
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
     
+    // Automatically change working directory to where the executable is located
+    char* base_path = SDL_GetBasePath();
+    if (base_path) {
+#ifndef _WIN32
+        chdir(base_path);
+#endif
+        printf("[DEBUG] Changed working directory to executable path: %s\n", base_path);
+        SDL_free(base_path);
+    }
+    
 #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 #endif
@@ -344,8 +379,8 @@ int main(int argc, char* argv[]) {
     
     // Cleanup subsystems
     closegraph();
-    closesound();
     dsclose();
+    closesound();
     
     return 0;
 }

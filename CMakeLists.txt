@@ -10,4 +10,5 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # Navigate into the subproject directory
-add_subdirectory("Yoni_Birkoni")
+add_subdirectory("Yoni Birkoni")
+

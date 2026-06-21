@@ -3,6 +3,8 @@
 
 #include "stdafx.h"
 #include <afxtempl.h>
+
+extern "C" char *getcwd(char *buf, size_t size);
 #include "yony.h"
 #include "yonyDlg.h"
 #include "sdl/GRAPH.H"
@@ -874,14 +876,32 @@ void StartLevel()
 	}
 	else passw = false;
 
+	printf("[DEBUG] StartLevel: lnum=%d\n", lnum);
+	char cwd_buf[1024];
+	if (getcwd(cwd_buf, sizeof(cwd_buf))) {
+		printf("[DEBUG] StartLevel: Working Directory = %s\n", cwd_buf);
+	}
 	lv.Format("%d\\",lnum);
+	printf("[DEBUG] StartLevel: formatted lv = '%s', normalized = '%s'\n", lv.c_str(), normalize_path(lv.c_str()).c_str());
+	DWORD attrs = GetFileAttributes(lv);
+	printf("[DEBUG] StartLevel: GetFileAttributes(lv) = 0x%08X\n", (unsigned int)attrs);
 	//if level not exist -> go to main screen
-	if (GetFileAttributes(lv)==0xFFFFFFFF) {lnum=0;lock=true;ShowCursor(true);g_exit_to_menu = true;return;}
+	if (attrs==0xFFFFFFFF) {
+		printf("[DEBUG] StartLevel: Level not found! Returning to main menu.\n");
+		lnum=0;lock=true;ShowCursor(true);g_exit_to_menu = true;return;
+	}
 	//load map
+	std::string map_path = (lv+"1.dat").c_str();
+	printf("[DEBUG] StartLevel: Loading map from '%s', normalized = '%s'\n", map_path.c_str(), normalize_path(map_path).c_str());
 	if (fl.Open(lv+"1.dat",CFile::modeRead))
 	{
 		fl.Read(board,sizeof(board));
 		fl.Close();
+		printf("[DEBUG] StartLevel: Map loaded successfully.\n");
+	}
+	else
+	{
+		printf("[DEBUG] StartLevel: Failed to load map from '%s'!\n", map_path.c_str());
 	}
 	//load level images
 	strcpy(bufr,(lv+"wall.gra").GetBuffer(1024));
@@ -2043,8 +2063,8 @@ void begingame()
 					putopt=false;
 					waitforent();
 					closegraph();
-					closesound();
 					dsclose();
+					closesound();
 					std::exit(0);
 				}
 				wait_for_release();

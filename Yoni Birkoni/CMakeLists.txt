@@ -95,6 +95,8 @@ elseif(ANDROID)
     set(SDL2_MIXER_DISABLE_INSTALL ON CACHE BOOL "Disable Mixer install" FORCE)
     set(SDL2MIXER_WAVE ON CACHE BOOL "Support WAV" FORCE)
     set(SDL2MIXER_MP3 ON CACHE BOOL "Support MP3" FORCE)
+    set(SDL2MIXER_MP3_MINIMP3 ON CACHE BOOL "Support loading MP3 music via minimp3" FORCE)
+    set(SDL2MIXER_MP3_MPG123 OFF CACHE BOOL "Support loading MP3 music via MPG123" FORCE)
     set(SDL2MIXER_MOD OFF CACHE BOOL "Disable MOD" FORCE)
     set(SDL2MIXER_MIDI OFF CACHE BOOL "Disable MIDI" FORCE)
     set(SDL2MIXER_FLAC OFF CACHE BOOL "Disable FLAC" FORCE)
@@ -135,16 +137,67 @@ else()
     # PC Desktop Targets (Windows MinGW, Linux, macOS)
     add_executable(yony ${GAME_SOURCES})
     
-    # Try CONFIG mode first, then MODULE mode
-    find_package(SDL2 REQUIRED)
-    find_package(SDL2_mixer REQUIRED)
-    find_package(SDL2_ttf REQUIRED)
+    # Try finding packages on the system
+    find_package(SDL2 QUIET)
+    find_package(SDL2_mixer QUIET)
+    find_package(SDL2_ttf QUIET)
     
-    target_link_libraries(yony PRIVATE
-        SDL2::SDL2
-        SDL2_mixer::SDL2_mixer
-        SDL2_ttf::SDL2_ttf
-    )
+    if(SDL2_FOUND AND SDL2_MIXER_FOUND AND SDL2_TTF_FOUND)
+        message(STATUS "Using system SDL2 libraries")
+        target_link_libraries(yony PRIVATE
+            SDL2::SDL2
+            SDL2_mixer::SDL2_mixer
+            SDL2_ttf::SDL2_ttf
+        )
+    else()
+        message(STATUS "System SDL2 libraries not found; building from external/src...")
+        
+        # Disable target installation to prevent redundant file copying
+        set(SDL2_DISABLE_INSTALL ON CACHE BOOL "Disable SDL2 install" FORCE)
+        
+        # SDL2_mixer settings
+        set(SDL2_MIXER_DISABLE_INSTALL ON CACHE BOOL "Disable Mixer install" FORCE)
+        set(SDL2MIXER_WAVE ON CACHE BOOL "Support WAV" FORCE)
+        set(SDL2MIXER_MP3 ON CACHE BOOL "Support MP3" FORCE)
+        set(SDL2MIXER_MP3_MINIMP3 ON CACHE BOOL "Support loading MP3 music via minimp3" FORCE)
+        set(SDL2MIXER_MP3_MPG123 OFF CACHE BOOL "Support loading MP3 music via MPG123" FORCE)
+        set(SDL2MIXER_MOD OFF CACHE BOOL "Disable MOD" FORCE)
+        set(SDL2MIXER_MIDI OFF CACHE BOOL "Disable MIDI" FORCE)
+        set(SDL2MIXER_FLAC OFF CACHE BOOL "Disable FLAC" FORCE)
+        set(SDL2MIXER_OPUS OFF CACHE BOOL "Disable Opus" FORCE)
+        set(SDL2MIXER_VORBIS "OFF" CACHE STRING "Disable Vorbis" FORCE)
+        set(SDL2MIXER_GME OFF CACHE BOOL "Disable GME" FORCE)
+        set(SDL2MIXER_WAVPACK OFF CACHE BOOL "Disable Wavpack" FORCE)
+        
+        # SDL2_ttf settings
+        set(SDL2_TTF_DISABLE_INSTALL ON CACHE BOOL "Disable TTF install" FORCE)
+        set(SDL2_TTF_HARFBUZZ OFF CACHE BOOL "Use HarfBuzz" FORCE)
+        
+        # Add library sources via add_subdirectory
+        if(NOT TARGET SDL2)
+            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2 ${CMAKE_BINARY_DIR}/SDL2)
+        endif()
+        if(NOT TARGET SDL2_mixer)
+            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2_mixer ${CMAKE_BINARY_DIR}/SDL2_mixer)
+        endif()
+        if(NOT TARGET SDL2_ttf)
+            add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2_ttf ${CMAKE_BINARY_DIR}/SDL2_ttf)
+        endif()
+        
+        target_link_libraries(yony PRIVATE
+            SDL2
+            SDL2_mixer
+            SDL2_ttf
+        )
+        
+        # Include source paths for headers as fallback
+        target_include_directories(yony PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2_mixer
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2_ttf
+        )
+    endif()
+
     
     # On desktop, copy staged assets to target bin directory at build time
     add_custom_command(TARGET yony POST_BUILD
