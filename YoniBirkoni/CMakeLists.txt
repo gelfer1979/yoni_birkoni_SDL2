@@ -35,6 +35,7 @@ endforeach()
 # Target source files for SDL2 port
 set(GAME_SOURCES
     YONI/YonyDlg.cpp
+    YONI/enemys.cpp
     YONI/sdl/compat.h
     YONI/sdl/GRAPH.H
     YONI/sdl/GRAPH.CPP
@@ -107,7 +108,7 @@ elseif(ANDROID)
     
     # SDL2_ttf settings
     set(SDL2_TTF_DISABLE_INSTALL ON CACHE BOOL "Disable TTF install" FORCE)
-    set(SDL2_TTF_HARFBUZZ OFF CACHE BOOL "Use HarfBuzz" FORCE)
+    set(SDL2TTF_HARFBUZZ OFF CACHE BOOL "Use HarfBuzz" FORCE)
     
     # Add library sources via add_subdirectory
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external/src/SDL2 ${CMAKE_BINARY_DIR}/SDL2)
@@ -171,7 +172,8 @@ else()
         
         # SDL2_ttf settings
         set(SDL2_TTF_DISABLE_INSTALL ON CACHE BOOL "Disable TTF install" FORCE)
-        set(SDL2_TTF_HARFBUZZ OFF CACHE BOOL "Use HarfBuzz" FORCE)
+        set(SDL2TTF_HARFBUZZ OFF CACHE BOOL "Use HarfBuzz" FORCE)
+        set(SDL2TTF_VENDORED ON CACHE BOOL "Use vendored third-party libraries" FORCE)
         
         # Add library sources via add_subdirectory
         if(NOT TARGET SDL2)
