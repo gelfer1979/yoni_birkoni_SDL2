@@ -38,13 +38,19 @@ extern bool pchang;
 extern int hcount;
 extern int s[];
 extern int score;
+extern int rmax;
 extern int rmax1;
 extern char board[19][26];
 extern int ctis;
 
 // Declarations of local global functions
 extern bool eat(int kmy, int kmx, bool player);
-extern int mrand(int n);
+int mrand(int n);
+
+// Helper functions for enemy logic
+bool IsWallInRect(int start_row, int start_col, int height_in_cells, int width_in_cells);
+bool ChooseEnemyDirection(int i);
+bool IsEnemyWallCollision(int i, int go);
 
 // Function to update enemy behavior (movement, collision, birth)
 void UpdateEnemiesBehavior();

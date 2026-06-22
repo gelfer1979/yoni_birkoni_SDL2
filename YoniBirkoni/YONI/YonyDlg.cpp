@@ -267,12 +267,7 @@ void showscore(int x,int y,int score1)
 	}
 }
 
-int mrand(int n)
-{
-	if (n==0) return 0;
-	if (n>2) return rand()/rmax;
-	else return rand()/rmax1;
-}
+
 
 
 
@@ -628,12 +623,18 @@ BOOL CPackmanDlg::OnInitDialog()
 	//HCURSOR dd=AfxGetApp()->LoadCursor(IDC_CURSOR1);
 	//SetCursor(dd);
 	//hiscore and options path
+#if defined(__ANDROID__)
 	GetTempPath(1024,hisctmp);
 	strcpy(optionstmp,hisctmp);
 	strcpy(curlevel, hisctmp);
 	strcat(hisctmp,"\\hiscore.dat");
 	strcat(optionstmp,"\\options.dat");
 	strcat(curlevel, "\\curlevel.dat");
+#else
+	strcpy(hisctmp, "hiscore.dat");
+	strcpy(optionstmp, "options.dat");
+	strcpy(curlevel, "curlevel.dat");
+#endif
 	if (GetFileAttributes(hisctmp)==0xFFFFFFFF)
 	{
 		CopyFile("hiscore.dat",hisctmp,false);
